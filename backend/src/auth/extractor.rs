@@ -1,17 +1,10 @@
 use axum::{
     extract::FromRequestParts,
-    http::{request::Parts, StatusCode},
-    Json,
+    http::request::Parts,
 };
-use serde::Serialize;
 use uuid::Uuid;
 
-#[derive(Debug, Serialize)]
-pub struct AuthErrorResponse {
-    pub error: String,
-}
-
-pub type AuthRejection = (StatusCode, Json<AuthErrorResponse>);
+use crate::error::AppError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UserId(pub Uuid);
@@ -25,7 +18,7 @@ impl<S> FromRequestParts<S> for UserId
 where
     S: Send + Sync,
 {
-    type Rejection = AuthRejection;
+    type Rejection = AppError;
 
     async fn from_request_parts(
         parts: &mut Parts,
@@ -35,7 +28,7 @@ where
             .extensions
             .get::<UserId>()
             .copied()
-            .ok_or_else(|| unauthorized("authentication required"))
+            .ok_or_else(|| AppError::Unauthorized(String::from("authentication required")))
     }
 }
 
@@ -43,7 +36,7 @@ impl<S> FromRequestParts<S> for CurrentUser
 where
     S: Send + Sync,
 {
-    type Rejection = AuthRejection;
+    type Rejection = AppError;
 
     async fn from_request_parts(
         parts: &mut Parts,
@@ -53,13 +46,4 @@ where
 
         Ok(Self { user_id })
     }
-}
-
-pub fn unauthorized(message: impl Into<String>) -> AuthRejection {
-    (
-        StatusCode::UNAUTHORIZED,
-        Json(AuthErrorResponse {
-            error: message.into(),
-        }),
-    )
 }

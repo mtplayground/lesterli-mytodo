@@ -1,5 +1,6 @@
 use crate::{
-    services::auth::{self, AuthServiceError, AuthenticatedUserOutput, LoginUserInput, RegisterUserInput},
+    error::AppError,
+    services::auth::{self, AuthenticatedUserOutput, LoginUserInput, RegisterUserInput},
     AppState,
 };
 use axum::{extract::State, http::StatusCode, Json};
@@ -32,15 +33,10 @@ pub struct RegisteredUserResponse {
     pub updated_at: i64,
 }
 
-#[derive(Debug, Serialize)]
-pub struct ErrorResponse {
-    pub error: String,
-}
-
 pub async fn register(
     State(state): State<AppState>,
     Json(payload): Json<RegisterRequest>,
-) -> Result<(StatusCode, Json<AuthResponse>), (StatusCode, Json<ErrorResponse>)> {
+) -> Result<(StatusCode, Json<AuthResponse>), AppError> {
     let registered = auth::register_user(
         &state,
         RegisterUserInput {
@@ -49,7 +45,7 @@ pub async fn register(
         },
     )
     .await
-    .map_err(map_auth_error)?;
+    .map_err(AppError::from)?;
 
     Ok(auth_response(StatusCode::CREATED, registered))
 }
@@ -57,7 +53,7 @@ pub async fn register(
 pub async fn login(
     State(state): State<AppState>,
     Json(payload): Json<LoginRequest>,
-) -> Result<(StatusCode, Json<AuthResponse>), (StatusCode, Json<ErrorResponse>)> {
+) -> Result<(StatusCode, Json<AuthResponse>), AppError> {
     let authenticated = auth::login_user(
         &state,
         LoginUserInput {
@@ -66,7 +62,7 @@ pub async fn login(
         },
     )
     .await
-    .map_err(map_auth_error)?;
+    .map_err(AppError::from)?;
 
     Ok(auth_response(StatusCode::OK, authenticated))
 }
@@ -84,26 +80,4 @@ fn auth_response(status: StatusCode, authenticated: AuthenticatedUserOutput) -> 
             },
         }),
     )
-}
-
-fn map_auth_error(error: AuthServiceError) -> (StatusCode, Json<ErrorResponse>) {
-    let (status, message) = match error {
-        AuthServiceError::Validation(message) => (StatusCode::BAD_REQUEST, message),
-        AuthServiceError::Conflict(message) => (StatusCode::CONFLICT, message),
-        AuthServiceError::Unauthorized(message) => (StatusCode::UNAUTHORIZED, message),
-        AuthServiceError::PasswordHash(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            String::from("failed to hash password"),
-        ),
-        AuthServiceError::Jwt(_) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            String::from("failed to generate token"),
-        ),
-        AuthServiceError::Database(error) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            format!("database error: {error}"),
-        ),
-    };
-
-    (status, Json(ErrorResponse { error: message }))
 }

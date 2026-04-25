@@ -1,5 +1,6 @@
 use crate::{
-    auth::{extractor::{unauthorized, AuthRejection, UserId}, jwt},
+    auth::{extractor::UserId, jwt},
+    error::AppError,
     AppState,
 };
 use axum::{
@@ -13,19 +14,23 @@ pub async fn require_auth(
     State(state): State<AppState>,
     mut request: Request,
     next: Next,
-) -> Result<Response, AuthRejection> {
+) -> Result<Response, AppError> {
     let auth_header = request
         .headers()
         .get(AUTHORIZATION)
-        .ok_or_else(|| unauthorized("missing authorization header"))?;
+        .ok_or_else(|| AppError::Unauthorized(String::from("missing authorization header")))?;
     let auth_value = auth_header
         .to_str()
-        .map_err(|_| unauthorized("invalid authorization header"))?;
+        .map_err(|_| AppError::Unauthorized(String::from("invalid authorization header")))?;
     let token = auth_value
         .strip_prefix("Bearer ")
-        .ok_or_else(|| unauthorized("authorization header must use Bearer token"))?;
+        .ok_or_else(|| {
+            AppError::Unauthorized(String::from(
+                "authorization header must use Bearer token",
+            ))
+        })?;
     let claims = jwt::decode_token(token, &state.config)
-        .map_err(|_| unauthorized("invalid or expired token"))?;
+        .map_err(|_| AppError::Unauthorized(String::from("invalid or expired token")))?;
 
     request.extensions_mut().insert(UserId(claims.claims.sub));
 
