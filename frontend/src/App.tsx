@@ -1,6 +1,10 @@
+import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Route, Routes } from 'react-router-dom'
+import { Link, Route, Routes } from 'react-router-dom'
 import { create } from 'zustand'
+import Login from './pages/Login'
+import Register from './pages/Register'
+import { useAuthStore } from './stores/auth'
 
 type HealthResponse = {
   status: string
@@ -33,6 +37,8 @@ async function fetchHealth(path: string): Promise<HealthResponse> {
 }
 
 function HealthPage() {
+  const hydrate = useAuthStore((state) => state.hydrate)
+  const user = useAuthStore((state) => state.user)
   const configuredApiBaseUrl = useFrontendState((state) => state.apiBaseUrl)
   const healthPath = useFrontendState((state) => state.healthPath)
   const healthQuery = useQuery({
@@ -40,6 +46,10 @@ function HealthPage() {
     queryFn: () => fetchHealth(healthPath),
     retry: false,
   })
+
+  useEffect(() => {
+    hydrate()
+  }, [hydrate])
 
   return (
     <main className="min-h-screen bg-canvas px-6 py-10 text-ink">
@@ -51,6 +61,20 @@ function HealthPage() {
             React, Vite, Tailwind, TanStack Query, Zustand, and React Router are configured. This
             placeholder page probes the backend health endpoint.
           </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              className="inline-flex items-center rounded-full border border-white/20 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
+              to="/login"
+            >
+              Login
+            </Link>
+            <Link
+              className="inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-medium text-ink transition hover:bg-slate-100"
+              to="/register"
+            >
+              Register
+            </Link>
+          </div>
         </header>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-panel">
@@ -66,6 +90,12 @@ function HealthPage() {
               </p>
               <p className="mt-2 text-sm text-slate-600">
                 Query target: <code className="rounded bg-slate-100 px-2 py-1">{healthPath}</code>
+              </p>
+              <p className="mt-2 text-sm text-slate-600">
+                Session:{' '}
+                <code className="rounded bg-slate-100 px-2 py-1">
+                  {user ? user.email : 'anonymous'}
+                </code>
               </p>
             </div>
 
@@ -111,6 +141,8 @@ export default function App() {
   return (
     <Routes>
       <Route element={<HealthPage />} path="/" />
+      <Route element={<Login />} path="/login" />
+      <Route element={<Register />} path="/register" />
       <Route element={<HealthPage />} path="*" />
     </Routes>
   )
