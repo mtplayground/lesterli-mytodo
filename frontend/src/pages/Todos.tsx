@@ -12,9 +12,12 @@ import {
   type TodoStatusFilter,
   type UpdateTodoInput,
 } from '../api/todos'
+import EmptyState from '../components/EmptyState'
 import FilterBar from '../components/FilterBar'
+import LoadingState from '../components/LoadingState'
 import TodoForm from '../components/TodoForm'
 import TodoItem from '../components/TodoItem'
+import Toast from '../components/Toast'
 import { useAuthStore } from '../stores/auth'
 
 const DEBOUNCE_MS = 250
@@ -209,6 +212,27 @@ export default function Todos() {
 
   return (
     <section className="space-y-6">
+      {actionError ? (
+        <Toast
+          message={actionError}
+          onDismiss={() => setActionError(null)}
+          title="Todo action failed"
+        />
+      ) : null}
+      {createError ? (
+        <Toast
+          message={createError}
+          onDismiss={() => setCreateError(null)}
+          title="Todo creation failed"
+        />
+      ) : null}
+      {editError ? (
+        <Toast
+          message={editError}
+          onDismiss={() => setEditError(null)}
+          title="Todo update failed"
+        />
+      ) : null}
       <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-panel">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
@@ -255,14 +279,11 @@ export default function Todos() {
             onToggleCompleted={handleToggleFromDetails}
           />
         ) : (
-          <section className="rounded-3xl border border-dashed border-slate-300 bg-white/60 p-8 shadow-panel">
-            <p className="text-sm uppercase tracking-[0.25em] text-slate-400">Todo Details</p>
-            <h2 className="mt-2 text-3xl font-semibold text-ink">Select an item to edit</h2>
-            <p className="mt-3 text-sm text-slate-600">
-              Choose any todo from the list below to update its title, description, or completion
-              status in the detail panel.
-            </p>
-          </section>
+          <EmptyState
+            eyebrow="Todo Details"
+            message="Choose any todo from the list below to update its title, description, or completion status in the detail panel."
+            title="Select an item to edit"
+          />
         )}
       </div>
 
@@ -274,17 +295,7 @@ export default function Todos() {
         status={statusFilter}
       />
 
-      {actionError ? (
-        <div className="rounded-3xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
-          {actionError}
-        </div>
-      ) : null}
-
-      {todosQuery.isPending ? (
-        <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-panel">
-          <p className="text-sm text-slate-600">Loading todos...</p>
-        </section>
-      ) : null}
+      {todosQuery.isPending ? <LoadingState label="Loading todos..." /> : null}
 
       {todosQuery.isError ? (
         <section className="rounded-3xl border border-red-200 bg-red-50 p-8 shadow-panel">
@@ -296,19 +307,19 @@ export default function Todos() {
       ) : null}
 
       {!todosQuery.isPending && !todosQuery.isError && todos.length === 0 ? (
-        <section className="rounded-3xl border border-dashed border-slate-300 bg-white/60 p-10 text-center shadow-panel">
-          <p className="text-sm uppercase tracking-[0.25em] text-slate-400">No Todos Yet</p>
-          <h2 className="mt-3 text-2xl font-semibold text-ink">
-            {hasActiveFilters(statusFilter, normalizedSearch)
-              ? 'No todos match the current filters.'
-              : 'Your list is empty.'}
-          </h2>
-          <p className="mt-3 text-sm text-slate-600">
-            {hasActiveFilters(statusFilter, normalizedSearch)
+        <EmptyState
+          eyebrow="No Todos Yet"
+          message={
+            hasActiveFilters(statusFilter, normalizedSearch)
               ? 'Try a different status tab or broaden the search input.'
-              : 'Add your first item with the form above and it will appear here immediately.'}
-          </p>
-        </section>
+              : 'Add your first item with the form above and it will appear here immediately.'
+          }
+          title={
+            hasActiveFilters(statusFilter, normalizedSearch)
+              ? 'No todos match the current filters.'
+              : 'Your list is empty.'
+          }
+        />
       ) : null}
 
       {!todosQuery.isPending && !todosQuery.isError && todos.length > 0 ? (

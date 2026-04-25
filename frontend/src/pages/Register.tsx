@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { register } from '../api/auth'
 import { ApiClientError } from '../api/client'
+import Toast from '../components/Toast'
 import { useAuthStore } from '../stores/auth'
 
 const MIN_PASSWORD_LENGTH = 8
@@ -62,6 +63,9 @@ export default function Register() {
 
   return (
     <main className="min-h-screen bg-canvas px-6 py-10 text-ink">
+      {error ? (
+        <Toast message={error} onDismiss={() => setError(null)} title="Registration failed" />
+      ) : null}
       <div className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[0.95fr_1.05fr]">
         <section className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-panel">
           <div className="mb-8">
@@ -99,12 +103,6 @@ export default function Register() {
                 value={password}
               />
             </label>
-
-            {error ? (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
-              </div>
-            ) : null}
 
             <button
               className="inline-flex w-full items-center justify-center rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"

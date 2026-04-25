@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { create } from 'zustand'
+import LoadingState from './components/LoadingState'
 import Header from './components/Header'
 import RequireAuth from './components/RequireAuth'
 import Login from './pages/Login'
@@ -84,9 +85,7 @@ function HealthPage() {
       </div>
 
       <div className="mt-8 rounded-2xl border border-slate-200 bg-slate-50 p-6">
-        {healthQuery.isPending ? (
-          <p className="text-sm text-slate-600">Checking backend health...</p>
-        ) : null}
+        {healthQuery.isPending ? <LoadingState label="Checking backend health..." /> : null}
 
         {healthQuery.isError ? (
           <div className="space-y-2">

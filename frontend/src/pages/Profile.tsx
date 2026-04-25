@@ -2,6 +2,9 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { FormEvent, useState } from 'react'
 import { ApiClientError } from '../api/client'
 import { changePassword, getMe } from '../api/me'
+import EmptyState from '../components/EmptyState'
+import LoadingState from '../components/LoadingState'
+import Toast from '../components/Toast'
 
 const MIN_PASSWORD_LENGTH = 8
 
@@ -65,6 +68,21 @@ export default function Profile() {
 
   return (
     <section className="space-y-6">
+      {changePasswordMutation.isError ? (
+        <Toast
+          message={toErrorMessage(changePasswordMutation.error, 'Failed to update password.')}
+          onDismiss={() => changePasswordMutation.reset()}
+          title="Password update failed"
+        />
+      ) : null}
+      {successMessage ? (
+        <Toast
+          message={successMessage}
+          onDismiss={() => setSuccessMessage(null)}
+          title="Password updated"
+          variant="success"
+        />
+      ) : null}
       <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-panel">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
@@ -82,14 +100,20 @@ export default function Profile() {
         <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-panel">
           <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Current User</p>
 
-          {meQuery.isPending ? (
-            <p className="mt-4 text-sm text-slate-600">Loading profile...</p>
-          ) : null}
+          {meQuery.isPending ? <LoadingState label="Loading profile..." /> : null}
 
           {meQuery.isError ? (
             <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {toErrorMessage(meQuery.error, 'Failed to load profile.')}
             </div>
+          ) : null}
+
+          {!meQuery.isPending && !meQuery.isError && !meQuery.data ? (
+            <EmptyState
+              eyebrow="Profile"
+              message="The account details are unavailable right now. Refresh and try again."
+              title="No profile data"
+            />
           ) : null}
 
           {meQuery.data ? (
@@ -165,18 +189,6 @@ export default function Profile() {
             {validationError ? (
               <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {validationError}
-              </div>
-            ) : null}
-
-            {changePasswordMutation.isError ? (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {toErrorMessage(changePasswordMutation.error, 'Failed to update password.')}
-              </div>
-            ) : null}
-
-            {successMessage ? (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                {successMessage}
               </div>
             ) : null}
 
