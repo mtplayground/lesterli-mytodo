@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { login } from '../api/auth'
 import { ApiClientError } from '../api/client'
+import Toast from '../components/Toast'
 import { useAuthStore } from '../stores/auth'
 
 export default function Login() {
@@ -60,6 +61,9 @@ export default function Login() {
 
   return (
     <main className="min-h-screen bg-canvas px-6 py-10 text-ink">
+      {error ? (
+        <Toast message={error} onDismiss={() => setError(null)} title="Login failed" />
+      ) : null}
       <div className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <section className="rounded-[2rem] bg-gradient-to-br from-ink to-slate-900 p-8 text-white shadow-panel">
           <p className="text-sm uppercase tracking-[0.3em] text-teal-200">Welcome Back</p>
@@ -109,12 +113,6 @@ export default function Login() {
                 value={password}
               />
             </label>
-
-            {error ? (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {error}
-              </div>
-            ) : null}
 
             <button
               className="inline-flex w-full items-center justify-center rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
