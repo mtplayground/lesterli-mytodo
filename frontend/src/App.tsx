@@ -4,6 +4,7 @@ import { create } from 'zustand'
 import Header from './components/Header'
 import RequireAuth from './components/RequireAuth'
 import Login from './pages/Login'
+import Profile from './pages/Profile'
 import Register from './pages/Register'
 import Todos from './pages/Todos'
 import { useAuthStore } from './stores/auth'
@@ -127,6 +128,7 @@ export default function App() {
         <Route element={<ProtectedLayout />}>
           <Route element={<Navigate replace to="/todos" />} path="/" />
           <Route element={<HealthPage />} path="/health" />
+          <Route element={<Profile />} path="/profile" />
           <Route element={<Todos />} path="/todos" />
         </Route>
       </Route>
