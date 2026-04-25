@@ -80,6 +80,7 @@ impl From<AuthServiceError> for AppError {
         match error {
             AuthServiceError::Validation(message) => Self::Validation(message),
             AuthServiceError::Conflict(message) => Self::Conflict(message),
+            AuthServiceError::NotFound(message) => Self::NotFound(message),
             AuthServiceError::Unauthorized(message) => Self::Unauthorized(message),
             AuthServiceError::PasswordHash(error) => Self::PasswordHash(error),
             AuthServiceError::Jwt(error) => Self::Jwt(error),

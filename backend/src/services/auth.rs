@@ -21,6 +21,12 @@ pub struct LoginUserInput {
 }
 
 #[derive(Debug)]
+pub struct ChangePasswordInput {
+    pub current_password: String,
+    pub new_password: String,
+}
+
+#[derive(Debug)]
 pub struct AuthenticatedUserOutput {
     pub token: String,
     pub user: RegisteredUser,
@@ -38,6 +44,7 @@ pub struct RegisteredUser {
 pub enum AuthServiceError {
     Validation(String),
     Conflict(String),
+    NotFound(String),
     Unauthorized(String),
     PasswordHash(password::PasswordError),
     Jwt(jwt::JwtError),
@@ -131,6 +138,65 @@ pub async fn login_user(
     Ok(AuthenticatedUserOutput { token, user })
 }
 
+pub async fn get_current_user(
+    state: &AppState,
+    user_id: Uuid,
+) -> Result<RegisteredUser, AuthServiceError> {
+    fetch_user_by_id(state, user_id)
+        .await?
+        .ok_or_else(|| AuthServiceError::NotFound(String::from("user not found")))
+}
+
+pub async fn change_password(
+    state: &AppState,
+    user_id: Uuid,
+    input: ChangePasswordInput,
+) -> Result<(), AuthServiceError> {
+    validate_login_password(&input.current_password)?;
+    validate_password(&input.new_password)?;
+
+    let row = sqlx::query_as::<_, (String,)>(
+        r#"
+        SELECT password_hash
+        FROM users
+        WHERE id = $1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_optional(&state.db_pool)
+    .await
+    .map_err(AuthServiceError::Database)?;
+
+    let Some((password_hash,)) = row else {
+        return Err(AuthServiceError::NotFound(String::from("user not found")));
+    };
+
+    let password_matches = password::verify_password(&input.current_password, &password_hash)?;
+    if !password_matches {
+        return Err(AuthServiceError::Unauthorized(String::from(
+            "current password is incorrect",
+        )));
+    }
+
+    let new_password_hash = password::hash_password(&input.new_password)?;
+
+    sqlx::query(
+        r#"
+        UPDATE users
+        SET password_hash = $2,
+            updated_at = NOW()
+        WHERE id = $1
+        "#,
+    )
+    .bind(user_id)
+    .bind(&new_password_hash)
+    .execute(&state.db_pool)
+    .await
+    .map_err(AuthServiceError::Database)?;
+
+    Ok(())
+}
+
 fn normalize_email(raw_email: &str) -> Result<String, AuthServiceError> {
     let email = raw_email.trim().to_lowercase();
 
@@ -188,4 +254,28 @@ fn map_database_error(error: SqlxError) -> AuthServiceError {
         }
         _ => AuthServiceError::Database(error),
     }
+}
+
+async fn fetch_user_by_id(
+    state: &AppState,
+    user_id: Uuid,
+) -> Result<Option<RegisteredUser>, AuthServiceError> {
+    let row = sqlx::query_as::<_, (Uuid, String, OffsetDateTime, OffsetDateTime)>(
+        r#"
+        SELECT id, email, created_at, updated_at
+        FROM users
+        WHERE id = $1
+        "#,
+    )
+    .bind(user_id)
+    .fetch_optional(&state.db_pool)
+    .await
+    .map_err(AuthServiceError::Database)?;
+
+    Ok(row.map(|(id, email, created_at, updated_at)| RegisteredUser {
+        id,
+        email,
+        created_at,
+        updated_at,
+    }))
 }

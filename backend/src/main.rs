@@ -38,6 +38,7 @@ mod repo {
 mod routes {
     pub mod auth;
     pub mod health;
+    pub mod me;
     pub mod todos;
 }
 
@@ -53,11 +54,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
         config: config.clone(),
         db_pool: db_pool.clone(),
     };
-    let protected_todo_routes = Router::new()
+    let protected_api_routes = Router::new()
         .route(
             "/api/todos",
             post(routes::todos::create_todo).get(routes::todos::list_todos),
         )
+        .route("/api/me", get(routes::me::get_me))
+        .route("/api/me/password", post(routes::me::change_password))
         .route(
             "/api/todos/{id}",
             get(routes::todos::get_todo)
@@ -73,7 +76,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .route("/health", get(routes::health::health))
         .route("/api/auth/register", post(routes::auth::register))
         .route("/api/auth/login", post(routes::auth::login))
-        .merge(protected_todo_routes)
+        .merge(protected_api_routes)
         .with_state(state)
         .layer(ServiceBuilder::new());
 
