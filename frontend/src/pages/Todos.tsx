@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ApiClientError } from '../api/client'
 import {
   createTodo,
@@ -20,6 +20,8 @@ export default function Todos() {
   const queryClient = useQueryClient()
   const [actionError, setActionError] = useState<string | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [selectedTodoId, setSelectedTodoId] = useState<string | null>(null)
   const user = useAuthStore((state) => state.user)
 
   const todosQuery = useQuery({
@@ -62,14 +64,30 @@ export default function Todos() {
     },
   })
 
-  const toggleMutation = useMutation({
-    mutationFn: ({ todo, input }: { todo: Todo; input: UpdateTodoInput }) =>
-      updateTodo(todo.id, input),
-    onError: (error) => {
-      setActionError(toErrorMessage(error, 'Failed to update todo.'))
+  const updateMutation = useMutation({
+    mutationFn: ({
+      todo,
+      input,
+    }: {
+      source: 'detail' | 'list'
+      todo: Todo
+      input: UpdateTodoInput
+    }) => updateTodo(todo.id, input),
+    onError: (error, variables) => {
+      const message = toErrorMessage(error, 'Failed to update todo.')
+
+      if (variables.source === 'detail') {
+        setEditError(message)
+      } else {
+        setActionError(message)
+      }
     },
-    onMutate: () => {
-      setActionError(null)
+    onMutate: (variables) => {
+      if (variables.source === 'detail') {
+        setEditError(null)
+      } else {
+        setActionError(null)
+      }
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY })
@@ -90,9 +108,18 @@ export default function Todos() {
   })
 
   const todos = todosQuery.data ?? []
+  const selectedTodo = todos.find((todo) => todo.id === selectedTodoId) ?? null
+
+  useEffect(() => {
+    if (selectedTodoId && !selectedTodo) {
+      setSelectedTodoId(null)
+      setEditError(null)
+    }
+  }, [selectedTodo, selectedTodoId])
 
   function handleToggle(todo: Todo) {
-    toggleMutation.mutate({
+    updateMutation.mutate({
+      source: 'list',
       todo,
       input: {
         title: todo.title,
@@ -104,6 +131,48 @@ export default function Todos() {
 
   function handleDelete(todo: Todo) {
     deleteMutation.mutate(todo)
+  }
+
+  async function handleUpdate(input: CreateTodoInput) {
+    if (!selectedTodo) {
+      return
+    }
+
+    await updateMutation.mutateAsync({
+      source: 'detail',
+      todo: selectedTodo,
+      input: {
+        title: input.title,
+        description: input.description,
+        completed: selectedTodo.completed,
+      },
+    })
+  }
+
+  function handleSelect(todo: Todo) {
+    setEditError(null)
+    setSelectedTodoId(todo.id)
+  }
+
+  function handleCloseDetails() {
+    setEditError(null)
+    setSelectedTodoId(null)
+  }
+
+  function handleToggleFromDetails() {
+    if (!selectedTodo) {
+      return
+    }
+
+    updateMutation.mutate({
+      source: 'detail',
+      todo: selectedTodo,
+      input: {
+        title: selectedTodo.title,
+        description: selectedTodo.description,
+        completed: !selectedTodo.completed,
+      },
+    })
   }
 
   async function handleCreate(input: CreateTodoInput) {
@@ -135,11 +204,39 @@ export default function Todos() {
         </div>
       </div>
 
-      <TodoForm
-        error={createMutation.isPending ? null : createError}
-        isSubmitting={createMutation.isPending}
-        onSubmit={handleCreate}
-      />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <TodoForm
+          error={createMutation.isPending ? null : createError}
+          isSubmitting={createMutation.isPending}
+          onSubmit={handleCreate}
+        />
+
+        {selectedTodo ? (
+          <TodoForm
+            completed={selectedTodo.completed}
+            error={updateMutation.isPending ? null : editError}
+            initialValue={{
+              title: selectedTodo.title,
+              description: selectedTodo.description,
+            }}
+            isSubmitting={updateMutation.isPending}
+            isToggling={updateMutation.isPending}
+            mode="edit"
+            onCancel={handleCloseDetails}
+            onSubmit={handleUpdate}
+            onToggleCompleted={handleToggleFromDetails}
+          />
+        ) : (
+          <section className="rounded-3xl border border-dashed border-slate-300 bg-white/60 p-8 shadow-panel">
+            <p className="text-sm uppercase tracking-[0.25em] text-slate-400">Todo Details</p>
+            <h2 className="mt-2 text-3xl font-semibold text-ink">Select an item to edit</h2>
+            <p className="mt-3 text-sm text-slate-600">
+              Choose any todo from the list below to update its title, description, or completion
+              status in the detail panel.
+            </p>
+          </section>
+        )}
+      </div>
 
       {actionError ? (
         <div className="rounded-3xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
@@ -177,9 +274,11 @@ export default function Todos() {
           {todos.map((todo) => (
             <TodoItem
               isDeleting={deleteMutation.isPending && deleteMutation.variables?.id === todo.id}
-              isToggling={toggleMutation.isPending && toggleMutation.variables?.todo.id === todo.id}
+              isSelected={selectedTodoId === todo.id}
+              isToggling={updateMutation.isPending && updateMutation.variables?.todo.id === todo.id}
               key={todo.id}
               onDelete={handleDelete}
+              onSelect={handleSelect}
               onToggle={handleToggle}
               todo={todo}
             />
