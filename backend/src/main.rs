@@ -7,6 +7,10 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 
 mod config;
 mod db;
+mod auth {
+    pub mod jwt;
+    pub mod password;
+}
 mod models {
     pub mod user;
 }
