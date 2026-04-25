@@ -1,0 +1,141 @@
+# Architecture Plan
+
+## Stack
+
+- Backend: Rust, Axum, Tokio, Serde, SQLx, Postgres, Tracing, tower-http
+- Frontend: React, Vite, TypeScript, Tailwind CSS, React Router, Zustand, React Hook Form
+- Infra: Docker, docker-compose, nginx for frontend static serving
+- Auth: password hashing with Argon2, JWT access tokens, bearer auth middleware
+- Testing: Rust integration tests against test database, Vitest + Testing Library for frontend
+
+## Repository Layout
+
+```text
+/
+├── backend/
+│   ├── Cargo.toml
+│   ├── src/
+│   │   ├── main.rs
+│   │   ├── app.rs
+│   │   ├── config.rs
+│   │   ├── state.rs
+│   │   ├── error.rs
+│   │   ├── auth/
+│   │   │   ├── mod.rs
+│   │   │   ├── jwt.rs
+│   │   │   ├── password.rs
+│   │   │   └── extractor.rs
+│   │   ├── routes/
+│   │   │   ├── mod.rs
+│   │   │   ├── health.rs
+│   │   │   ├── auth.rs
+│   │   │   ├── profile.rs
+│   │   │   └── todos.rs
+│   │   ├── models/
+│   │   │   ├── mod.rs
+│   │   │   ├── user.rs
+│   │   │   └── todo.rs
+│   │   ├── db/
+│   │   │   ├── mod.rs
+│   │   │   └── migrations/
+│   │   └── dto/
+│   │       ├── mod.rs
+│   │       ├── auth.rs
+│   │       ├── profile.rs
+│   │       └── todo.rs
+│   └── tests/
+├── frontend/
+│   ├── package.json
+│   ├── vite.config.ts
+│   ├── tailwind.config.ts
+│   ├── src/
+│   │   ├── main.tsx
+│   │   ├── App.tsx
+│   │   ├── api/
+│   │   │   ├── client.ts
+│   │   │   ├── auth.ts
+│   │   │   └── todos.ts
+│   │   ├── app/
+│   │   │   ├── router.tsx
+│   │   │   └── store/
+│   │   │       └── auth.ts
+│   │   ├── pages/
+│   │   │   ├── LoginPage.tsx
+│   │   │   ├── RegisterPage.tsx
+│   │   │   ├── TodoListPage.tsx
+│   │   │   └── ProfilePage.tsx
+│   │   ├── components/
+│   │   │   ├── ProtectedRoute.tsx
+│   │   │   ├── TodoForm.tsx
+│   │   │   ├── TodoFilters.tsx
+│   │   │   └── states/
+│   │   ├── hooks/
+│   │   ├── types/
+│   │   │   ├── auth.ts
+│   │   │   ├── todo.ts
+│   │   │   └── api.ts
+│   │   └── lib/
+│   └── public/
+├── docker-compose.yml
+├── .env.example
+└── README.md
+```
+
+## Shared Type Strategy
+
+- Keep backend request and response DTOs separate from database models.
+- Mirror API contracts in frontend `src/types`, using stable names such as `AuthResponse`, `CurrentUser`, `Todo`, and `PaginatedTodos`.
+- Standardize error payloads early: `{"error":{"code":"...","message":"...","details":...}}`.
+- Use RFC3339 timestamps in JSON and `uuid` primary keys for users and todos to keep backend and frontend contracts stable.
+
+## Core Design Decisions
+
+- Use a monorepo with `backend/` and `frontend/` as independent apps sharing only HTTP contracts.
+- Introduce configuration loading before database or auth work so runtime setup is stable.
+- Add centralized app state in backend holding config, db pool, and auth settings.
+- Keep route handlers thin: validation/DTO mapping in handlers, business/data access in model or service modules.
+- Add auth middleware/extractor before todo endpoints so all authenticated handlers share one path.
+- Build the frontend around a single API client that injects JWT tokens and normalizes API errors.
+- Store auth state in memory plus localStorage rehydration; keep routing protection in one wrapper component.
+- Implement todo list query parameters in backend before frontend filter UI to avoid contract churn.
+- Keep Docker and compose aligned with local dev defaults from `.env.example`.
+
+## Issue Dependencies
+
+- 1 -> foundation for all later work
+- 2 depends on 1
+- 3 depends on 1
+- 4 depends on 2 and 3 shape decisions
+- 5 depends on 2 and 4
+- 6 depends on 2
+- 7 depends on 3
+- 8 depends on 4, 5, 6, 7
+- 9 depends on 5
+- 10 depends on 9
+- 11 depends on 10
+- 12 depends on 10
+- 13 depends on 12
+- 14 should land before broad endpoint expansion; depends on 2 and should be aligned with 11 to 13
+- 15 depends on 3 and backend auth contract from 11 to 14
+- 16 depends on 15
+- 17 depends on 15 and 16
+- 18 depends on 5
+- 19 depends on 13, 14, 18
+- 20 depends on 15, 17, 19
+- 21 depends on 20 and 19
+- 22 depends on 20 and 19
+- 23 depends on 19
+- 24 depends on 20 and 23
+- 25 depends on 13 and 14
+- 26 depends on 15, 17, 25
+- 27 depends on 11 to 13, 19, 23, 25
+- 28 depends on 16, 17, 20 to 22, 24, 26
+- 29 depends on 14, 15, 20 to 26
+- 30 depends on 8, 27, 28, 29
+
+## Suggested Implementation Order Notes
+
+- Land issue 14 earlier than its numeric position if issue sequencing is flexible; error shape stabilization reduces rework.
+- Define auth response and todo response schemas before frontend issue 15 to avoid duplicated contract fixes.
+- Keep migrations additive and versioned under `backend/migrations/`.
+- Reserve README completion for issue 30, but keep `.plan` as the working architecture source until then.
