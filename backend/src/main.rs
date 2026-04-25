@@ -1,46 +1,8 @@
-use axum::{
-    middleware,
-    routing::{get, post},
-    Router,
-};
+use lesterli_mytodo_backend::{build_app, build_state, config, db};
 use std::error::Error;
 use tokio::net::TcpListener;
-use tower::ServiceBuilder;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
-
-#[derive(Clone)]
-pub struct AppState {
-    pub config: config::AppConfig,
-    pub db_pool: db::DbPool,
-}
-
-mod config;
-mod db;
-mod error;
-mod auth {
-    pub mod extractor;
-    pub mod jwt;
-    pub mod middleware;
-    pub mod password;
-}
-mod models {
-    pub mod todo;
-    pub mod user;
-}
-mod services {
-    pub mod auth;
-    pub mod todos;
-}
-mod repo {
-    pub mod todos;
-}
-mod routes {
-    pub mod auth;
-    pub mod health;
-    pub mod me;
-    pub mod todos;
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -48,37 +10,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     init_tracing(&config.rust_log);
 
     let socket_addr = config.socket_addr()?;
-    let db_pool = db::connect(&config).await?;
-    db::migrate(&db_pool).await?;
-    let state = AppState {
-        config: config.clone(),
-        db_pool: db_pool.clone(),
-    };
-    let protected_api_routes = Router::new()
-        .route(
-            "/api/todos",
-            post(routes::todos::create_todo).get(routes::todos::list_todos),
-        )
-        .route("/api/me", get(routes::me::get_me))
-        .route("/api/me/password", post(routes::me::change_password))
-        .route(
-            "/api/todos/{id}",
-            get(routes::todos::get_todo)
-                .put(routes::todos::update_todo)
-                .delete(routes::todos::delete_todo),
-        )
-        .route_layer(middleware::from_fn_with_state(
-            state.clone(),
-            auth::middleware::require_auth,
-        ));
-
-    let app = Router::new()
-        .route("/health", get(routes::health::health))
-        .route("/api/auth/register", post(routes::auth::register))
-        .route("/api/auth/login", post(routes::auth::login))
-        .merge(protected_api_routes)
-        .with_state(state)
-        .layer(ServiceBuilder::new());
+    let state = build_state(config.clone()).await?;
+    db::migrate(&state.db_pool).await?;
+    let app = build_app(state);
 
     let listener = TcpListener::bind(socket_addr).await?;
     info!(
