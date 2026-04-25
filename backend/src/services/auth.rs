@@ -15,7 +15,13 @@ pub struct RegisterUserInput {
 }
 
 #[derive(Debug)]
-pub struct RegisterUserOutput {
+pub struct LoginUserInput {
+    pub email: String,
+    pub password: String,
+}
+
+#[derive(Debug)]
+pub struct AuthenticatedUserOutput {
     pub token: String,
     pub user: RegisteredUser,
 }
@@ -32,6 +38,7 @@ pub struct RegisteredUser {
 pub enum AuthServiceError {
     Validation(String),
     Conflict(String),
+    Unauthorized(String),
     PasswordHash(password::PasswordError),
     Jwt(jwt::JwtError),
     Database(SqlxError),
@@ -52,7 +59,7 @@ impl From<jwt::JwtError> for AuthServiceError {
 pub async fn register_user(
     state: &AppState,
     input: RegisterUserInput,
-) -> Result<RegisterUserOutput, AuthServiceError> {
+) -> Result<AuthenticatedUserOutput, AuthServiceError> {
     let email = normalize_email(&input.email)?;
     validate_password(&input.password)?;
 
@@ -78,7 +85,50 @@ pub async fn register_user(
     };
     let token = jwt::encode_token(user.id, &state.config)?;
 
-    Ok(RegisterUserOutput { token, user })
+    Ok(AuthenticatedUserOutput { token, user })
+}
+
+pub async fn login_user(
+    state: &AppState,
+    input: LoginUserInput,
+) -> Result<AuthenticatedUserOutput, AuthServiceError> {
+    let email = normalize_email(&input.email)?;
+    validate_login_password(&input.password)?;
+
+    let row = sqlx::query_as::<_, (Uuid, String, String, OffsetDateTime, OffsetDateTime)>(
+        r#"
+        SELECT id, email, password_hash, created_at, updated_at
+        FROM users
+        WHERE email = $1
+        "#,
+    )
+    .bind(&email)
+    .fetch_optional(&state.db_pool)
+    .await
+    .map_err(AuthServiceError::Database)?;
+
+    let Some((id, email, password_hash, created_at, updated_at)) = row else {
+        return Err(AuthServiceError::Unauthorized(String::from(
+            "invalid email or password",
+        )));
+    };
+
+    let password_matches = password::verify_password(&input.password, &password_hash)?;
+    if !password_matches {
+        return Err(AuthServiceError::Unauthorized(String::from(
+            "invalid email or password",
+        )));
+    }
+
+    let user = RegisteredUser {
+        id,
+        email,
+        created_at,
+        updated_at,
+    };
+    let token = jwt::encode_token(user.id, &state.config)?;
+
+    Ok(AuthenticatedUserOutput { token, user })
 }
 
 fn normalize_email(raw_email: &str) -> Result<String, AuthServiceError> {
@@ -113,6 +163,16 @@ fn validate_password(password: &str) -> Result<(), AuthServiceError> {
     if password.len() < MIN_PASSWORD_LENGTH {
         return Err(AuthServiceError::Validation(format!(
             "password must be at least {MIN_PASSWORD_LENGTH} characters"
+        )));
+    }
+
+    Ok(())
+}
+
+fn validate_login_password(password: &str) -> Result<(), AuthServiceError> {
+    if password.is_empty() {
+        return Err(AuthServiceError::Validation(String::from(
+            "password is required",
         )));
     }
 

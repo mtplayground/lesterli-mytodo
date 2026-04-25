@@ -47,6 +47,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let app = Router::new()
         .route("/health", get(routes::health::health))
         .route("/api/auth/register", post(routes::auth::register))
+        .route("/api/auth/login", post(routes::auth::login))
         .with_state(state)
         .layer(ServiceBuilder::new());
 
