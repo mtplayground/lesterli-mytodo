@@ -1,12 +1,13 @@
 use crate::{
     auth::extractor::CurrentUser,
     error::AppError,
+    repo::todos::TodoListFilters,
     models::todo::{CreateTodoInput, TodoResponse, UpdateTodoInput},
     services::todos,
     AppState,
 };
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
@@ -30,6 +31,12 @@ pub struct UpdateTodoRequest {
     #[validate(custom(function = "validate_description"))]
     pub description: Option<String>,
     pub completed: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListTodosQuery {
+    pub status: Option<String>,
+    pub q: Option<String>,
 }
 
 pub async fn create_todo(
@@ -56,8 +63,9 @@ pub async fn create_todo(
 pub async fn list_todos(
     State(state): State<AppState>,
     CurrentUser { user_id }: CurrentUser,
+    Query(query): Query<ListTodosQuery>,
 ) -> Result<Json<Vec<TodoResponse>>, AppError> {
-    let todos = todos::list_todos(&state, user_id.0)
+    let todos = todos::list_todos(&state, user_id.0, todo_list_filters(query)?)
         .await
         .map_err(AppError::from)?;
 
@@ -159,4 +167,24 @@ fn validation_error(message: &str) -> ValidationError {
     let mut error = ValidationError::new("invalid");
     error.message = Some(Cow::Owned(String::from(message)));
     error
+}
+
+fn todo_list_filters(query: ListTodosQuery) -> Result<TodoListFilters, AppError> {
+    let completed = match query.status.as_deref().map(str::trim) {
+        None | Some("") | Some("all") => None,
+        Some("active") => Some(false),
+        Some("completed") => Some(true),
+        Some(_) => {
+            return Err(AppError::Validation(String::from(
+                "status must be one of all, active, or completed",
+            )))
+        }
+    };
+    let query = query
+        .q
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
+        .map(|value| format!("%{value}%"));
+
+    Ok(TodoListFilters { completed, query })
 }

@@ -4,6 +4,12 @@ use crate::{
 };
 use uuid::Uuid;
 
+#[derive(Debug, Clone, Default)]
+pub struct TodoListFilters {
+    pub completed: Option<bool>,
+    pub query: Option<String>,
+}
+
 pub async fn create_todo(
     pool: &DbPool,
     user_id: Uuid,
@@ -23,16 +29,28 @@ pub async fn create_todo(
     .await
 }
 
-pub async fn list_todos(pool: &DbPool, user_id: Uuid) -> Result<Vec<Todo>, sqlx::Error> {
+pub async fn list_todos(
+    pool: &DbPool,
+    user_id: Uuid,
+    filters: &TodoListFilters,
+) -> Result<Vec<Todo>, sqlx::Error> {
     sqlx::query_as::<_, Todo>(
         r#"
         SELECT id, user_id, title, description, completed, created_at, updated_at
         FROM todos
         WHERE user_id = $1
+          AND ($2::BOOL IS NULL OR completed = $2)
+          AND (
+              $3::TEXT IS NULL
+              OR title ILIKE $3
+              OR COALESCE(description, '') ILIKE $3
+          )
         ORDER BY created_at DESC, id DESC
         "#,
     )
     .bind(user_id)
+    .bind(filters.completed)
+    .bind(filters.query.as_deref())
     .fetch_all(pool)
     .await
 }
