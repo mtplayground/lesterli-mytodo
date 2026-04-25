@@ -6,6 +6,7 @@ use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 mod config;
+mod db;
 mod routes {
     pub mod health;
 }
@@ -16,6 +17,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     init_tracing(&config.rust_log);
 
     let socket_addr = config.socket_addr()?;
+    let db_pool = db::connect(&config).await?;
+    db::migrate(&db_pool).await?;
 
     let app = Router::new()
         .route("/health", get(routes::health::health))
@@ -24,6 +27,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let listener = TcpListener::bind(socket_addr).await?;
     info!(
         %socket_addr,
+        database_ready = true,
         jwt_expiry_hours = config.jwt_expiry_hours,
         has_database_url = !config.database_url.is_empty(),
         has_jwt_secret = !config.jwt_secret.is_empty(),
