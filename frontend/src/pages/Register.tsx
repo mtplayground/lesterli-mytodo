@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { register } from '../api/auth'
 import { ApiClientError } from '../api/client'
 import { useAuthStore } from '../stores/auth'
@@ -7,6 +7,7 @@ import { useAuthStore } from '../stores/auth'
 const MIN_PASSWORD_LENGTH = 8
 
 export default function Register() {
+  const location = useLocation()
   const navigate = useNavigate()
   const setSession = useAuthStore((state) => state.setSession)
   const token = useAuthStore((state) => state.token)
@@ -15,11 +16,13 @@ export default function Register() {
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  const redirectTo = getRedirectPath(location.state)
+
   useEffect(() => {
     if (token) {
-      navigate('/', { replace: true })
+      navigate(redirectTo, { replace: true })
     }
-  }, [navigate, token])
+  }, [navigate, redirectTo, token])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -45,7 +48,7 @@ export default function Register() {
       })
 
       setSession(session)
-      navigate('/', { replace: true })
+      navigate(redirectTo, { replace: true })
     } catch (caughtError) {
       if (caughtError instanceof ApiClientError) {
         setError(caughtError.message)
@@ -150,4 +153,18 @@ export default function Register() {
 function isValidEmail(value: string): boolean {
   const parts = value.split('@')
   return parts.length === 2 && parts[0].length > 0 && parts[1].includes('.')
+}
+
+function getRedirectPath(state: unknown): string {
+  if (typeof state !== 'object' || state === null) {
+    return '/'
+  }
+
+  const candidate = state as {
+    from?: {
+      pathname?: string
+    }
+  }
+
+  return candidate.from?.pathname || '/'
 }
