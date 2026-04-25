@@ -2,23 +2,31 @@ import type { Todo } from '../api/todos'
 
 type TodoItemProps = {
   isDeleting: boolean
+  isSelected: boolean
   isToggling: boolean
   onDelete: (todo: Todo) => void
+  onSelect: (todo: Todo) => void
   onToggle: (todo: Todo) => void
   todo: Todo
 }
 
 export default function TodoItem({
   isDeleting,
+  isSelected,
   isToggling,
   onDelete,
+  onSelect,
   onToggle,
   todo,
 }: TodoItemProps) {
   const timestamp = new Date(todo.updated_at * 1000).toLocaleString()
 
   return (
-    <article className="rounded-3xl border border-slate-200 bg-white p-5 shadow-panel">
+    <article
+      className={`rounded-3xl border bg-white p-5 shadow-panel transition ${
+        isSelected ? 'border-accent ring-2 ring-teal-100' : 'border-slate-200'
+      }`}
+    >
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-3">
@@ -67,6 +75,18 @@ export default function TodoItem({
             type="button"
           >
             {isToggling ? 'Saving...' : todo.completed ? 'Mark active' : 'Mark done'}
+          </button>
+          <button
+            className={`inline-flex items-center rounded-full border px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${
+              isSelected
+                ? 'border-accent bg-teal-50 text-accent'
+                : 'border-slate-300 text-slate-700 hover:border-accent hover:text-accent'
+            }`}
+            disabled={isDeleting}
+            onClick={() => onSelect(todo)}
+            type="button"
+          >
+            {isSelected ? 'Editing' : 'Edit details'}
           </button>
           <button
             className="inline-flex items-center rounded-full border border-red-200 px-4 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
