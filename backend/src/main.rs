@@ -17,7 +17,9 @@ pub struct AppState {
 mod config;
 mod db;
 mod auth {
+    pub mod extractor;
     pub mod jwt;
+    pub mod middleware;
     pub mod password;
 }
 mod models {
