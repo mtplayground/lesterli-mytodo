@@ -24,6 +24,7 @@ mod auth {
     pub mod password;
 }
 mod models {
+    pub mod todo;
     pub mod user;
 }
 mod services {
