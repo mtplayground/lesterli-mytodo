@@ -10,10 +10,21 @@ export type Todo = {
   updated_at: number
 }
 
+export type CreateTodoInput = {
+  title: string
+  description: string | null
+}
+
 export type UpdateTodoInput = {
   title: string
   description: string | null
   completed: boolean
+}
+
+export function createTodo(input: CreateTodoInput): Promise<Todo> {
+  return apiClient.post<Todo>('/api/todos', {
+    body: input,
+  })
 }
 
 export function listTodos(): Promise<Todo[]> {
