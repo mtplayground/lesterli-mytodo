@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize};
+use sqlx::FromRow;
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, PartialEq, Eq)]
 pub struct Todo {
     pub id: Uuid,
     pub user_id: Uuid,
@@ -21,9 +22,9 @@ pub struct CreateTodoInput {
 
 #[derive(Debug, Clone, Default, Deserialize, PartialEq, Eq)]
 pub struct UpdateTodoInput {
-    pub title: Option<String>,
+    pub title: String,
     pub description: Option<String>,
-    pub completed: Option<bool>,
+    pub completed: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]

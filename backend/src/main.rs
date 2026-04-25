@@ -1,4 +1,5 @@
 use axum::{
+    middleware,
     routing::{get, post},
     Router,
 };
@@ -29,10 +30,15 @@ mod models {
 }
 mod services {
     pub mod auth;
+    pub mod todos;
+}
+mod repo {
+    pub mod todos;
 }
 mod routes {
     pub mod auth;
     pub mod health;
+    pub mod todos;
 }
 
 #[tokio::main]
@@ -47,11 +53,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
         config: config.clone(),
         db_pool: db_pool.clone(),
     };
+    let protected_todo_routes = Router::new()
+        .route(
+            "/api/todos",
+            post(routes::todos::create_todo).get(routes::todos::list_todos),
+        )
+        .route(
+            "/api/todos/{id}",
+            get(routes::todos::get_todo)
+                .put(routes::todos::update_todo)
+                .delete(routes::todos::delete_todo),
+        )
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth::middleware::require_auth,
+        ));
 
     let app = Router::new()
         .route("/health", get(routes::health::health))
         .route("/api/auth/register", post(routes::auth::register))
         .route("/api/auth/login", post(routes::auth::login))
+        .merge(protected_todo_routes)
         .with_state(state)
         .layer(ServiceBuilder::new());
 
