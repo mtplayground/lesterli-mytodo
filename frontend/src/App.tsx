@@ -7,11 +7,15 @@ type HealthResponse = {
 }
 
 type FrontendState = {
+  apiBaseUrl: string
   healthPath: string
 }
 
+const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL ?? '').trim().replace(/\/$/, '')
+
 const useFrontendState = create<FrontendState>(() => ({
-  healthPath: '/health',
+  apiBaseUrl,
+  healthPath: `${apiBaseUrl}/health`,
 }))
 
 async function fetchHealth(path: string): Promise<HealthResponse> {
@@ -29,6 +33,7 @@ async function fetchHealth(path: string): Promise<HealthResponse> {
 }
 
 function HealthPage() {
+  const configuredApiBaseUrl = useFrontendState((state) => state.apiBaseUrl)
   const healthPath = useFrontendState((state) => state.healthPath)
   const healthQuery = useQuery({
     queryKey: ['health', healthPath],
@@ -53,6 +58,12 @@ function HealthPage() {
             <div>
               <p className="text-sm uppercase tracking-[0.25em] text-slate-500">Health Check</p>
               <h2 className="mt-2 text-2xl font-semibold">Backend status</h2>
+              <p className="mt-2 text-sm text-slate-600">
+                API base URL:{' '}
+                <code className="rounded bg-slate-100 px-2 py-1">
+                  {configuredApiBaseUrl || '(same origin)'}
+                </code>
+              </p>
               <p className="mt-2 text-sm text-slate-600">
                 Query target: <code className="rounded bg-slate-100 px-2 py-1">{healthPath}</code>
               </p>

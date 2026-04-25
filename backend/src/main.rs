@@ -1,48 +1,43 @@
 use axum::{routing::get, Router};
-use std::{env, error::Error, io, net::SocketAddr};
+use std::error::Error;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
+mod config;
 mod routes {
     pub mod health;
 }
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    init_tracing();
+    let config = config::AppConfig::from_env()?;
+    init_tracing(&config.rust_log);
 
-    let bind_addr = env::var("BIND_ADDR").unwrap_or_else(|_| String::from("0.0.0.0:8080"));
-    let socket_addr = parse_bind_addr(&bind_addr)?;
+    let socket_addr = config.socket_addr()?;
 
     let app = Router::new()
         .route("/health", get(routes::health::health))
         .layer(ServiceBuilder::new());
 
     let listener = TcpListener::bind(socket_addr).await?;
-    info!(%socket_addr, "backend listening");
+    info!(
+        %socket_addr,
+        jwt_expiry_hours = config.jwt_expiry_hours,
+        has_database_url = !config.database_url.is_empty(),
+        has_jwt_secret = !config.jwt_secret.is_empty(),
+        "backend listening"
+    );
 
     axum::serve(listener, app).await?;
 
     Ok(())
 }
 
-fn init_tracing() {
+fn init_tracing(rust_log: &str) {
     tracing_subscriber::registry()
-        .with(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("lesterli_mytodo_backend=info")),
-        )
+        .with(EnvFilter::new(rust_log))
         .with(tracing_subscriber::fmt::layer())
         .init();
-}
-
-fn parse_bind_addr(bind_addr: &str) -> Result<SocketAddr, io::Error> {
-    bind_addr.parse::<SocketAddr>().map_err(|error| {
-        io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("invalid BIND_ADDR `{bind_addr}`: {error}"),
-        )
-    })
 }
