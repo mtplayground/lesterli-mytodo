@@ -1,6 +1,6 @@
 use crate::{
     auth::{jwt, password},
-    services::auth::AuthServiceError,
+    services::{auth::AuthServiceError, todos::TodoServiceError},
 };
 use axum::{
     http::StatusCode,
@@ -15,6 +15,7 @@ pub enum AppError {
     Validation(String),
     Unauthorized(String),
     Conflict(String),
+    NotFound(String),
     Database(sqlx::Error),
     Jwt(jwt::JwtError),
     PasswordHash(password::PasswordError),
@@ -33,6 +34,7 @@ impl fmt::Display for AppError {
             Self::Validation(message)
             | Self::Unauthorized(message)
             | Self::Conflict(message)
+            | Self::NotFound(message)
             | Self::Internal(message) => write!(formatter, "{message}"),
             Self::Database(error) => write!(formatter, "{error}"),
             Self::Jwt(error) => write!(formatter, "{error}"),
@@ -49,6 +51,7 @@ impl IntoResponse for AppError {
             Self::Validation(message) => (StatusCode::BAD_REQUEST, "validation_error", message),
             Self::Unauthorized(message) => (StatusCode::UNAUTHORIZED, "unauthorized", message),
             Self::Conflict(message) => (StatusCode::CONFLICT, "conflict", message),
+            Self::NotFound(message) => (StatusCode::NOT_FOUND, "not_found", message),
             Self::Database(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "database_error",
@@ -81,6 +84,16 @@ impl From<AuthServiceError> for AppError {
             AuthServiceError::PasswordHash(error) => Self::PasswordHash(error),
             AuthServiceError::Jwt(error) => Self::Jwt(error),
             AuthServiceError::Database(error) => Self::Database(error),
+        }
+    }
+}
+
+impl From<TodoServiceError> for AppError {
+    fn from(error: TodoServiceError) -> Self {
+        match error {
+            TodoServiceError::Validation(message) => Self::Validation(message),
+            TodoServiceError::NotFound(message) => Self::NotFound(message),
+            TodoServiceError::Database(error) => Self::Database(error),
         }
     }
 }
