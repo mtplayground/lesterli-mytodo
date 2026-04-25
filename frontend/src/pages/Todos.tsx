@@ -7,42 +7,55 @@ import {
   listTodos,
   updateTodo,
   type CreateTodoInput,
+  type ListTodosFilters,
   type Todo,
+  type TodoStatusFilter,
   type UpdateTodoInput,
 } from '../api/todos'
+import FilterBar from '../components/FilterBar'
 import TodoForm from '../components/TodoForm'
 import TodoItem from '../components/TodoItem'
 import { useAuthStore } from '../stores/auth'
 
-const TODOS_QUERY_KEY = ['todos']
+const DEBOUNCE_MS = 250
+const TODOS_QUERY_KEY = ['todos'] as const
 
 export default function Todos() {
   const queryClient = useQueryClient()
   const [actionError, setActionError] = useState<string | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
   const [editError, setEditError] = useState<string | null>(null)
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [selectedTodoId, setSelectedTodoId] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<TodoStatusFilter>('all')
   const user = useAuthStore((state) => state.user)
+  const normalizedSearch = debouncedSearch.trim()
+  const currentListFilters: ListTodosFilters = {
+    q: normalizedSearch || undefined,
+    status: statusFilter,
+  }
+  const currentTodosQueryKey = [...TODOS_QUERY_KEY, statusFilter, normalizedSearch] as const
 
   const todosQuery = useQuery({
-    queryKey: TODOS_QUERY_KEY,
-    queryFn: listTodos,
+    queryKey: currentTodosQueryKey,
+    queryFn: () => listTodos(currentListFilters),
   })
 
   const createMutation = useMutation<Todo, unknown, CreateTodoInput, { previousTodos: Todo[] }>({
     mutationFn: (input: CreateTodoInput) => createTodo(input),
     onError: (error, _input, context) => {
       if (context?.previousTodos) {
-        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos)
+        queryClient.setQueryData(currentTodosQueryKey, context.previousTodos)
       }
 
       setCreateError(toErrorMessage(error, 'Failed to create todo.'))
     },
     onMutate: async (input) => {
       setCreateError(null)
-      await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY })
+      await queryClient.cancelQueries({ queryKey: currentTodosQueryKey })
 
-      const previousTodos = queryClient.getQueryData<Todo[]>(TODOS_QUERY_KEY) ?? []
+      const previousTodos = queryClient.getQueryData<Todo[]>(currentTodosQueryKey) ?? []
       const now = Math.floor(Date.now() / 1000)
       const optimisticTodo: Todo = {
         id: `optimistic-${now}`,
@@ -54,7 +67,12 @@ export default function Todos() {
         updated_at: now,
       }
 
-      queryClient.setQueryData<Todo[]>(TODOS_QUERY_KEY, [optimisticTodo, ...previousTodos])
+      queryClient.setQueryData<Todo[]>(
+        currentTodosQueryKey,
+        matchesFilters(optimisticTodo, statusFilter, normalizedSearch)
+          ? [optimisticTodo, ...previousTodos]
+          : previousTodos,
+      )
 
       return { previousTodos }
     },
@@ -109,6 +127,16 @@ export default function Todos() {
 
   const todos = todosQuery.data ?? []
   const selectedTodo = todos.find((todo) => todo.id === selectedTodoId) ?? null
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearch(searchInput)
+    }, DEBOUNCE_MS)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [searchInput])
 
   useEffect(() => {
     if (selectedTodoId && !selectedTodo) {
@@ -238,6 +266,14 @@ export default function Todos() {
         )}
       </div>
 
+      <FilterBar
+        isSearching={searchInput !== debouncedSearch}
+        onSearchChange={setSearchInput}
+        onStatusChange={setStatusFilter}
+        searchValue={searchInput}
+        status={statusFilter}
+      />
+
       {actionError ? (
         <div className="rounded-3xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
           {actionError}
@@ -262,9 +298,15 @@ export default function Todos() {
       {!todosQuery.isPending && !todosQuery.isError && todos.length === 0 ? (
         <section className="rounded-3xl border border-dashed border-slate-300 bg-white/60 p-10 text-center shadow-panel">
           <p className="text-sm uppercase tracking-[0.25em] text-slate-400">No Todos Yet</p>
-          <h2 className="mt-3 text-2xl font-semibold text-ink">Your list is empty.</h2>
+          <h2 className="mt-3 text-2xl font-semibold text-ink">
+            {hasActiveFilters(statusFilter, normalizedSearch)
+              ? 'No todos match the current filters.'
+              : 'Your list is empty.'}
+          </h2>
           <p className="mt-3 text-sm text-slate-600">
-            Add your first item with the form above and it will appear here immediately.
+            {hasActiveFilters(statusFilter, normalizedSearch)
+              ? 'Try a different status tab or broaden the search input.'
+              : 'Add your first item with the form above and it will appear here immediately.'}
           </p>
         </section>
       ) : null}
@@ -299,4 +341,25 @@ function toErrorMessage(error: unknown, fallback: string): string {
   }
 
   return fallback
+}
+
+function hasActiveFilters(status: TodoStatusFilter, query: string): boolean {
+  return status !== 'all' || query.length > 0
+}
+
+function matchesFilters(todo: Todo, status: TodoStatusFilter, query: string): boolean {
+  if (status === 'active' && todo.completed) {
+    return false
+  }
+
+  if (status === 'completed' && !todo.completed) {
+    return false
+  }
+
+  if (!query) {
+    return true
+  }
+
+  const haystack = `${todo.title}\n${todo.description ?? ''}`.toLowerCase()
+  return haystack.includes(query.toLowerCase())
 }
