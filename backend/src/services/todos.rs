@@ -1,6 +1,6 @@
 use crate::{
     models::todo::{CreateTodoInput, Todo, UpdateTodoInput},
-    repo::todos as todo_repo,
+    repo::todos::{self as todo_repo, TodoListFilters},
     AppState,
 };
 use sqlx::Error as SqlxError;
@@ -34,8 +34,12 @@ pub async fn create_todo(
         .map_err(TodoServiceError::from)
 }
 
-pub async fn list_todos(state: &AppState, user_id: Uuid) -> Result<Vec<Todo>, TodoServiceError> {
-    todo_repo::list_todos(&state.db_pool, user_id)
+pub async fn list_todos(
+    state: &AppState,
+    user_id: Uuid,
+    filters: TodoListFilters,
+) -> Result<Vec<Todo>, TodoServiceError> {
+    todo_repo::list_todos(&state.db_pool, user_id, &filters)
         .await
         .map_err(TodoServiceError::from)
 }
