@@ -34,6 +34,15 @@ Issue `#1` establishes the repository structure and shared tooling only. Applica
 - Backend runtime will target Rust with `sqlx`.
 - Frontend runtime will target React with Vite in a later issue.
 
+## Local Database Setup
+
+1. Copy the example environment values and set `DATABASE_URL` for your local or remote PostgreSQL instance.
+2. Install SQLx CLI with PostgreSQL support:
+   `cargo install sqlx-cli --no-default-features --features postgres,rustls`
+3. Run migrations from the backend workspace:
+   `cd backend && sqlx migrate run`
+4. Start the backend with the same `DATABASE_URL`; startup also applies embedded migrations from `backend/migrations/`.
+
 ## Next Steps
 
 - Issue `#2`: bootstrap the Rust/Axum backend skeleton.

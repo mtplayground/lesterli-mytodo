@@ -1,0 +1,2 @@
+-- Initial migration placeholder.
+-- Subsequent schema changes will build on this baseline.
