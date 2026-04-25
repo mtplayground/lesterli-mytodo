@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../stores/auth'
 
 export default function Header() {
@@ -32,6 +32,30 @@ export default function Header() {
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">
+        <NavLink
+          className={({ isActive }) =>
+            `inline-flex items-center rounded-full border px-4 py-2 text-sm font-medium transition ${
+              isActive
+                ? 'border-white bg-white text-ink'
+                : 'border-white/20 text-white hover:bg-white/10'
+            }`
+          }
+          to="/todos"
+        >
+          Todos
+        </NavLink>
+        <NavLink
+          className={({ isActive }) =>
+            `inline-flex items-center rounded-full border px-4 py-2 text-sm font-medium transition ${
+              isActive
+                ? 'border-white bg-white text-ink'
+                : 'border-white/20 text-white hover:bg-white/10'
+            }`
+          }
+          to="/health"
+        >
+          Health
+        </NavLink>
         <button
           className="inline-flex items-center rounded-full bg-white px-4 py-2 text-sm font-medium text-ink transition hover:bg-slate-100"
           onClick={handleLogout}

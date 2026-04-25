@@ -5,6 +5,7 @@ import Header from './components/Header'
 import RequireAuth from './components/RequireAuth'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import Todos from './pages/Todos'
 import { useAuthStore } from './stores/auth'
 
 type HealthResponse = {
@@ -124,7 +125,9 @@ export default function App() {
       <Route element={<Register />} path="/register" />
       <Route element={<RequireAuth />}>
         <Route element={<ProtectedLayout />}>
-          <Route element={<HealthPage />} path="/" />
+          <Route element={<Navigate replace to="/todos" />} path="/" />
+          <Route element={<HealthPage />} path="/health" />
+          <Route element={<Todos />} path="/todos" />
         </Route>
       </Route>
       <Route element={<Navigate replace to="/" />} path="*" />
