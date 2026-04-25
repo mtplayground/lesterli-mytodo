@@ -1,18 +1,65 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { ApiClientError } from '../api/client'
-import { deleteTodo, listTodos, updateTodo, type Todo, type UpdateTodoInput } from '../api/todos'
+import {
+  createTodo,
+  deleteTodo,
+  listTodos,
+  updateTodo,
+  type CreateTodoInput,
+  type Todo,
+  type UpdateTodoInput,
+} from '../api/todos'
+import TodoForm from '../components/TodoForm'
 import TodoItem from '../components/TodoItem'
+import { useAuthStore } from '../stores/auth'
 
 const TODOS_QUERY_KEY = ['todos']
 
 export default function Todos() {
   const queryClient = useQueryClient()
   const [actionError, setActionError] = useState<string | null>(null)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const user = useAuthStore((state) => state.user)
 
   const todosQuery = useQuery({
     queryKey: TODOS_QUERY_KEY,
     queryFn: listTodos,
+  })
+
+  const createMutation = useMutation<Todo, unknown, CreateTodoInput, { previousTodos: Todo[] }>({
+    mutationFn: (input: CreateTodoInput) => createTodo(input),
+    onError: (error, _input, context) => {
+      if (context?.previousTodos) {
+        queryClient.setQueryData(TODOS_QUERY_KEY, context.previousTodos)
+      }
+
+      setCreateError(toErrorMessage(error, 'Failed to create todo.'))
+    },
+    onMutate: async (input) => {
+      setCreateError(null)
+      await queryClient.cancelQueries({ queryKey: TODOS_QUERY_KEY })
+
+      const previousTodos = queryClient.getQueryData<Todo[]>(TODOS_QUERY_KEY) ?? []
+      const now = Math.floor(Date.now() / 1000)
+      const optimisticTodo: Todo = {
+        id: `optimistic-${now}`,
+        user_id: user?.id ?? 'unknown-user',
+        title: input.title,
+        description: input.description,
+        completed: false,
+        created_at: now,
+        updated_at: now,
+      }
+
+      queryClient.setQueryData<Todo[]>(TODOS_QUERY_KEY, [optimisticTodo, ...previousTodos])
+
+      return { previousTodos }
+    },
+    onSuccess: async () => {
+      setCreateError(null)
+      await queryClient.invalidateQueries({ queryKey: TODOS_QUERY_KEY })
+    },
   })
 
   const toggleMutation = useMutation({
@@ -59,6 +106,10 @@ export default function Todos() {
     deleteMutation.mutate(todo)
   }
 
+  async function handleCreate(input: CreateTodoInput) {
+    await createMutation.mutateAsync(input)
+  }
+
   return (
     <section className="space-y-6">
       <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-panel">
@@ -83,6 +134,12 @@ export default function Todos() {
           </button>
         </div>
       </div>
+
+      <TodoForm
+        error={createMutation.isPending ? null : createError}
+        isSubmitting={createMutation.isPending}
+        onSubmit={handleCreate}
+      />
 
       {actionError ? (
         <div className="rounded-3xl border border-red-200 bg-red-50 px-5 py-4 text-sm text-red-700">
@@ -110,7 +167,7 @@ export default function Todos() {
           <p className="text-sm uppercase tracking-[0.25em] text-slate-400">No Todos Yet</p>
           <h2 className="mt-3 text-2xl font-semibold text-ink">Your list is empty.</h2>
           <p className="mt-3 text-sm text-slate-600">
-            Todo creation comes next. This page is ready to render your items once they exist.
+            Add your first item with the form above and it will appear here immediately.
           </p>
         </section>
       ) : null}
