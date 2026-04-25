@@ -1,9 +1,18 @@
-use axum::{routing::get, Router};
+use axum::{
+    routing::{get, post},
+    Router,
+};
 use std::error::Error;
 use tokio::net::TcpListener;
 use tower::ServiceBuilder;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
+
+#[derive(Clone)]
+pub struct AppState {
+    pub config: config::AppConfig,
+    pub db_pool: db::DbPool,
+}
 
 mod config;
 mod db;
@@ -14,7 +23,11 @@ mod auth {
 mod models {
     pub mod user;
 }
+mod services {
+    pub mod auth;
+}
 mod routes {
+    pub mod auth;
     pub mod health;
 }
 
@@ -26,9 +39,15 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let socket_addr = config.socket_addr()?;
     let db_pool = db::connect(&config).await?;
     db::migrate(&db_pool).await?;
+    let state = AppState {
+        config: config.clone(),
+        db_pool: db_pool.clone(),
+    };
 
     let app = Router::new()
         .route("/health", get(routes::health::health))
+        .route("/api/auth/register", post(routes::auth::register))
+        .with_state(state)
         .layer(ServiceBuilder::new());
 
     let listener = TcpListener::bind(socket_addr).await?;
